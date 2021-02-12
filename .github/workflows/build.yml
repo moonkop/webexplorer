@@ -22,7 +22,7 @@ jobs:
         uses: burnett01/rsync-deployments@4.1
         with:
           switches: -avzr --delete
-          path: build/
+          path: dist/
           remote_path: /www/wwwroot/tools.moonkop.com
           remote_host: moonkop.com
           remote_port: 22
