@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Preact</title>
+	<style>
+        body {
+            font-family: microsoft YaHei;
+        }
+
+        .dropBox {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            border: 10px solid #ffd1d9;
+            border-radius: 37px;
+            background: #ffd1d9;
+            color: #FFF;
+            font-size: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dropBox.copible {
+            cursor: pointer;
+        }
+
+        .dropBox.copible:active {
+            background: #e6bdc4;
+        }
+
+        .dropBox .dropBox-text {
+            color: #FFF;
+            font-size: 30px;
+            text-align: center;
+            user-select: none;
+        }
+
+        .urls {
+            text-align: center;
+            margin: auto;
+            right: 0;
+            left: 0;
+            bottom: 100px;
+            color: #AAA;
+            font-size: 12px;
+        }
+
+        .wrapper {
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            flex-direction: row;
+            align-items: center;
+        }
+	</style>
+	<script src="http://libs.baidu.com/jquery/2.0.0/jquery.js"></script>
+
+</head>
+<body>
+<div id="root"></div>
+</body>
+</html>
