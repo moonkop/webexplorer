@@ -1,11 +1,15 @@
 import {Component, h, render} from 'preact'
-import {checkFileExist} from "./api";
+import {Actions, MyFiles} from "./api";
+import * as path from "path";
 
 interface AppState {
 	dropBoxText: string;
 	urls: string[];
 	uploadPercent: number;
+	currentPath: string;
+	currentFiles: MyFiles[];
 }
+
 class App extends Component<{}, AppState> {
 	fileInput: HTMLInputElement;
 	resetTimer: NodeJS.Timeout
@@ -14,18 +18,56 @@ class App extends Component<{}, AppState> {
 	constructor(props) {
 		super(props);
 		this.state = {
-			dropBoxText: '拖进来吧',
-			urls       : [],
-			uploadPercent:100,
+			dropBoxText  : '拖进来吧',
+			urls         : [],
+			uploadPercent: 100,
+			currentPath  : '',
+			currentFiles : []
 		}
 		this.dropBoxEnabled = true;
 	}
 
+	async componentDidMount() {
+		console.log('componentDidMount')
+		window.addEventListener('hashchange', this.onHashChange);
+		this.setCurrentPathFromUrl(location.href);
+
+	}
+
+	componentWillUnmount() {
+		window.removeEventListener('hashchange', this.onHashChange);
+	}
+
+	componentDidUpdate(previousProps: Readonly<{}>, previousState: Readonly<AppState>, snapshot: any) {
+		if (this.state.currentPath != previousState.currentPath) {
+			this.getCurrentFileList();
+		}
+	}
+
+	setCurrentPathFromUrl(str) {
+		let url = new URL(str);
+		let path = url.hash.substr(1);
+		if (!path) {
+			location.hash = '/';
+			return;
+		}
+		this.setState({currentPath: path});
+	}
+
+	onHashChange = (e) => {
+		console.log('onHashChange')
+		this.setCurrentPathFromUrl(e.newURL);
+	};
+
+	async getCurrentFileList() {
+		this.setState({currentFiles: []})
+		let files = await Actions.getFileList(this.state.currentPath);
+		this.setState({currentFiles: files})
+	}
+
 	upLoadFile = async (files: FileList) => {
 		this.dropBoxEnabled = false;
-
-		let checkResult: string[] = await checkFileExist(Array.from(files).map(item => item.name));
-
+		let checkResult: string[] = await Actions.checkFileExist(Array.from(files).map(item => item.name));
 		if (checkResult.length) {
 			if (!confirm(checkResult.join(',') + ' 这些文件已经在里面啦 要覆盖吗 ？')) {
 				return;
@@ -36,55 +78,49 @@ class App extends Component<{}, AppState> {
 		for (let i = 0; i < files.length; i++) {
 			formData.append("fileToUpload[" + i + ']', files[i]);
 		}
-		let request = $.ajax({
-			type       : "POST",
-			url        : "http://tools.moonkop.com/uploadHandler.php?action=upload",
-			data       : formData,			//这里上传的数据使用了formData 对象
-			processData: false, 	//必须false才会自动加上正确的Content-Type
-			contentType: false,
-			dataType   : 'json',
-			xhr        :  () =>{
-				let xhr = $.ajaxSettings.xhr();
-				if (xhr.upload) {
-					xhr.upload.addEventListener("progress",  (progressEvent) =>{
-						let percent = (progressEvent.loaded / progressEvent.total) * 100;
-						this.setState({
-							uploadPercent: percent
-						})
-					}, false);
-					return xhr;
-				}
-			},
-			success    : (e) => {
-				if (e.code == 100) {
-					this.setDropBoxText('上传成功辣！')
-					// $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
-					// $('.dropBox').addClass("copible");
-					// new ClipboardJS('.copible',{
-					//     text: function(){
-					//         return $('.urls').text();
-					//     }
-					// });
-
-					this.setState({
-						urls: e.payload.urls
-					})
-					if (e.payload.overwrites.length) {
-						alert(e.payload.overwrites.join(',') + '已经被成功覆盖掉啦');
+		await new Promise(resolve => {
+			let request = $.ajax({
+				type       : "POST",
+				url        : "http://tools.moonkop.com/uploadHandler.php?action=upload",
+				data       : formData,			//这里上传的数据使用了formData 对象
+				processData: false, 	//必须false才会自动加上正确的Content-Type
+				contentType: false,
+				dataType   : 'json',
+				xhr        : () => {
+					let xhr = $.ajaxSettings.xhr();
+					if (xhr.upload) {
+						xhr.upload.addEventListener("progress", (progressEvent) => {
+							let percent = (progressEvent.loaded / progressEvent.total) * 100;
+							this.setState({
+								uploadPercent: percent
+							})
+						}, false);
+						return xhr;
 					}
-				} else {
-					alert(e.msg);
+				},
+				success    : (e) => {
+					if (e.code == 100) {
+						this.setDropBoxText('上传成功辣！')
+						this.setState({
+							urls: e.payload.urls
+						})
+						if (e.payload.overwrites.length) {
+							alert(e.payload.overwrites.join(',') + '已经被成功覆盖掉啦');
+						}
+					} else {
+						alert(e.msg);
+					}
+					resolve();
+
+				},
+				error      : function (e: any) {
+					alert('奇怪了 怎么就失败了呢？' + e.msg as string);
+					resolve();
 				}
-				this.dropBoxEnabled = true;
-
-			},
-			error      : function (e: any) {
-				alert('奇怪了 怎么就失败了呢？' + e.msg as string);
-				this.dropBoxEnabled = true;
-
-
-			}
+			})
 		})
+		this.dropBoxEnabled = true;
+		this.getCurrentFileList();
 	}
 
 	setDropBoxText = (str: string) => {
@@ -99,7 +135,7 @@ class App extends Component<{}, AppState> {
 			<div className='content'>
 				<div className="dropBox"
 				     style={{
-				     	background:this.state.uploadPercent==100?null:`linear-gradient(to top,#FFd1d9 ${this.state.uploadPercent}%,#FFF ${this.state.uploadPercent}%)`
+					     background: this.state.uploadPercent == 100 ? null : `linear-gradient(to top,#FFd1d9 ${this.state.uploadPercent}%,#FFF ${this.state.uploadPercent}%)`
 				     }}
 				     onClick={() => {
 					     if (!this.dropBoxEnabled) {
@@ -143,7 +179,7 @@ class App extends Component<{}, AppState> {
 				</div>
 
 				<div class="urls">
-					{this.state.urls.map(item=>{
+					{this.state.urls.map(item => {
 						return <div>
 							{item}
 						</div>;
@@ -155,19 +191,60 @@ class App extends Component<{}, AppState> {
 				}} type="file" name="fileToUpload" onChange={(e) => {
 					this.upLoadFile(e.currentTarget.files);
 				}}/>
+				<div onClick={() => {
+					let name = prompt('input dir name:');
+					if (!name) {
+						return;
+					}
+					Actions.mkdir(this.state.currentPath + '/' + name);
+					setTimeout(() => {
+						this.getCurrentFileList();
+					}, 100)
 
+				}}>
+					newdir
+				</div>
+				<div className="currentPath">
+					{(() => {
+						let lastPath = '/';
+						let paths = (this.state.currentPath).split('/').filter(Boolean);
+						paths.unshift('');
+						return paths.map(item => {
+							console.log(item);
+							lastPath = path.resolve(lastPath + '/' + item);
+							let full = lastPath;
+							return <span onClick={() => {
+								console.log(full);
+								location.hash = full;
+							}}>{item?item:'root'}/</span>
+						})
+					})()}
+				</div>
+
+				<div className="filesContainer">
+					{this.state.currentFiles.map(item => {
+						return <div onClick={() => {
+							let path1=path.resolve(this.state.currentPath, item.name);
+							if (item.is_dir) {
+								location.hash = path1;
+							}else{
+								window.open('http://tools.moonkop.com/upload/'+path1);
+							}
+						}}>
+							{item.is_dir ? '>' : ''}{item.name}
+						</div>;
+					})}
+				</div>
 
 			</div>
 		);
 	}
 }
 
-
 render(
 	<App/>,
 	document.getElementById('root')
 )
-
 
 
 $(document).on({
