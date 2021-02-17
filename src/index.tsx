@@ -1,6 +1,7 @@
 import {Component, h, render} from 'preact'
 import {Actions, MyFiles} from "./api";
 import * as path from "path";
+import './index.scss';
 
 interface AppState {
 	dropBoxText: string;
@@ -129,20 +130,21 @@ class App extends Component<{}, AppState> {
 		})
 
 	};
+	onUploadClick=() => {
+		if (!this.dropBoxEnabled) {
+			return
+		}
+		this.fileInput.click();
+	}
 
 	render() {
 		return (
-			<div className='content'>
+			<div className='app'>
 				<div className="dropBox"
 				     style={{
 					     background: this.state.uploadPercent == 100 ? null : `linear-gradient(to top,#FFd1d9 ${this.state.uploadPercent}%,#FFF ${this.state.uploadPercent}%)`
 				     }}
-				     onClick={() => {
-					     if (!this.dropBoxEnabled) {
-						     return
-					     }
-					     this.fileInput.click();
-				     }}
+				     onClick={this.onUploadClick}
 				     onDragEnter={e => {
 					     console.log('onDragEnter', e)
 					     if (!this.dropBoxEnabled) {
@@ -191,47 +193,68 @@ class App extends Component<{}, AppState> {
 				}} type="file" name="fileToUpload" onChange={(e) => {
 					this.upLoadFile(e.currentTarget.files);
 				}}/>
-				<div onClick={() => {
-					let name = prompt('input dir name:');
-					if (!name) {
-						return;
-					}
-					Actions.mkdir(this.state.currentPath + '/' + name);
-					setTimeout(() => {
-						this.getCurrentFileList();
-					}, 100)
-
-				}}>
-					newdir
-				</div>
 				<div className="currentPath">
 					{(() => {
 						let lastPath = '/';
 						let paths = (this.state.currentPath).split('/').filter(Boolean);
 						paths.unshift('');
-						return paths.map(item => {
+						let jsx = paths.map(item => {
 							console.log(item);
 							lastPath = path.resolve(lastPath + '/' + item);
 							let full = lastPath;
-							return <span onClick={() => {
+							return <span className='pathItem' onClick={() => {
 								console.log(full);
 								location.hash = full;
-							}}>{item?item:'root'}/</span>
+							}}>{item ? item : 'root'}</span>
 						})
+						let jsxJoined = [];
+						jsx.map(item => {
+							jsxJoined.push(item);
+							jsxJoined.push(<span className="iconfont iconpage-next"/>)
+						})
+						jsxJoined.pop();
+						return jsxJoined;
 					})()}
+				</div>
+
+				<div className="actions">
+					<div className='mkdir' onClick={() => {
+						let name = prompt('input dir name:');
+						if (!name) {
+							return;
+						}
+						Actions.mkdir(this.state.currentPath + '/' + name);
+						setTimeout(() => {
+							this.getCurrentFileList();
+						}, 100)
+
+					}}>
+						<span className="iconfont iconxinjianwenjianjia1"/>
+					</div>
+					<div className="upload" onClick={this.onUploadClick}>
+						<span className="iconfont iconshangchuan1"/>
+					</div>
+					<div className="download">
+						<span className="iconfont iconxiazai"/>
+					</div>
+					<div className="delete">
+						<span className="iconfont iconshanchu"/>
+					</div>
 				</div>
 
 				<div className="filesContainer">
 					{this.state.currentFiles.map(item => {
-						return <div onClick={() => {
-							let path1=path.resolve(this.state.currentPath, item.name);
+						return <div className='file' onClick={() => {
+							let path1 = path.resolve(this.state.currentPath, item.name);
 							if (item.is_dir) {
 								location.hash = path1;
-							}else{
-								window.open('http://tools.moonkop.com/upload/'+path1);
+							} else {
+								window.open('http://tools.moonkop.com/upload/' + path1);
 							}
 						}}>
-							{item.is_dir ? '>' : ''}{item.name}
+
+							{item.is_dir ? <span className="iconfont iconputongwenjianjia"/> :
+								<span className="iconfont iconwenjian_"/>}{item.name}
 						</div>;
 					})}
 				</div>
