@@ -5,6 +5,11 @@ $linkBlue: #42a5f5;
   height: 100%;
 }
 
+.flex-placeholder {
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+
 .filesContainer {
 
   border-top: 1px solid $border;
@@ -16,26 +21,62 @@ $linkBlue: #42a5f5;
     border-bottom: 1px solid $border;
     padding: 2px 15px;
     display: flex;
-    .iconfont{
+
+    .fileActions {
+      //display: none;
+      .fileAction {
+        padding: 2px 5px;
+      }
+    }
+
+    .fileName {
+      flex-grow: 1;
+      flex-shrink: 1;
+    }
+
+    &:hover {
+      box-shadow: 0 1px 10px 0 $border;
+      z-index: 1;
+      background: #fafafa;
+      cursor: pointer;
+
+      .fileName, .fileIcon {
+        color: $linkBlue;
+      }
+
+      .fileActions {
+        display: block;
+
+        .fileAction {
+          &:hover {
+            box-shadow: 0 1px 10px 0 $border;
+
+            color: $linkBlue;
+          }
+        }
+
+      }
+    }
+
+    .iconfont {
       font-size: 25px;
     }
   }
 
-  .file:hover {
-    box-shadow: 0 1px 10px 0 $border;
-    z-index: 1;
-    color: $linkBlue;
-    background: #fafafa;
-    cursor: pointer;
+  .action {
+    display: none;
   }
+
 }
 
 .currentPath {
   font-size: 25px;
   padding: 5px 15px;
-  .iconfont{
+
+  .iconfont {
     font-size: 25px;
   }
+
   .pathItem {
     cursor: pointer;
 
@@ -108,18 +149,31 @@ body {
   margin: 0;
   padding: 0;
 }
-.app{
- // padding: 10px;
+
+.app {
+  // padding: 10px;
 }
-.iconfont{
+
+.iconfont {
 }
-.actions{
+
+.actions {
   padding: 5px;
   display: flex;
-  &>div{
-    margin: 0 10px;
+  cursor: pointer;
+
+
+  & > div {
+    padding: 5px 10px;
+
+    &:hover {
+      box-shadow: 0 1px 10px 0 $border;
+
+      color: $linkBlue;
+    }
   }
-  .iconfont{
+
+  .iconfont {
     font-size: 35px;
   }
 }

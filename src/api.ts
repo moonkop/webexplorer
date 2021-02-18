@@ -30,7 +30,7 @@ export function request(options: {
 	});
 }
 
-export interface MyFiles {
+export interface MyFile {
 	name: string,
 	is_dir: 0 | 1;
 }
@@ -42,10 +42,10 @@ export class Actions {
 		return res;
 	}
 
-	static async getFileList(dir: string): Promise<MyFiles[]> {
+	static async getFileList(dir: string): Promise<MyFile[]> {
 		let {res, err} = await request({action: 'fileList', body: {dir}});
 		panic(err);
-		let res1: MyFiles[] = res;
+		let res1: MyFile[] = res;
 		res1 = [...res1.filter(item => item.is_dir), ...res1.filter(item => !item.is_dir)];
 		res1 = res1.filter(item => item.name.charAt(0) != '.');
 		return res1;
@@ -54,6 +54,12 @@ export class Actions {
 
 	static async mkdir(path: string): Promise<string[]> {
 		let {res, err} = await request({action: 'mkdir', body: {path}});
+		panic(err);
+		return res;
+	}
+
+	static async deleteFile(path: string) {
+		let {res, err} = await request({action: 'deleteFile', body: {path}});
 		panic(err);
 		return res;
 	}

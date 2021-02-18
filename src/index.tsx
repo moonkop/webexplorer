@@ -1,5 +1,5 @@
 import {Component, h, render} from 'preact'
-import {Actions, MyFiles} from "./api";
+import {Actions, MyFile} from "./api";
 import * as path from "path";
 import './index.scss';
 
@@ -8,7 +8,7 @@ interface AppState {
 	urls: string[];
 	uploadPercent: number;
 	currentPath: string;
-	currentFiles: MyFiles[];
+	currentFiles: MyFile[];
 }
 
 class App extends Component<{}, AppState> {
@@ -67,18 +67,30 @@ class App extends Component<{}, AppState> {
 	}
 
 	upLoadFile = async (files: FileList) => {
+		if (files.length == 0) {
+			return;
+		}
 		this.dropBoxEnabled = false;
-		let checkResult: string[] = await Actions.checkFileExist(Array.from(files).map(item => item.name));
-		if (checkResult.length) {
-			if (!confirm(checkResult.join(',') + ' 这些文件已经在里面啦 要覆盖吗 ？')) {
+		let fileArr = Array.from(files);
+		let nameSet = new Set(fileArr.map(item => item.name));
+		let hasFile: MyFile[] = [];
+		this.state.currentFiles.map(file => {
+			if (nameSet.has(file.name)) {
+				hasFile.push(file);
+			}
+		})
+		if (hasFile.length) {
+			if (!confirm(hasFile.map(item => item.name).join(',') + ' 这些文件已经在里面啦 要覆盖吗 ？')) {
 				return;
 			}
 		}
-
 		let formData = new FormData();
+		formData.append('path', this.state.currentPath);
 		for (let i = 0; i < files.length; i++) {
 			formData.append("fileToUpload[" + i + ']', files[i]);
 		}
+		this.fileInput.value = '';
+
 		await new Promise(resolve => {
 			let request = $.ajax({
 				type       : "POST",
@@ -100,7 +112,7 @@ class App extends Component<{}, AppState> {
 					}
 				},
 				success    : (e) => {
-					if (e.code == 100) {
+					if (e.code == 200) {
 						this.setDropBoxText('上传成功辣！')
 						this.setState({
 							urls: e.payload.urls
@@ -130,56 +142,154 @@ class App extends Component<{}, AppState> {
 		})
 
 	};
-	onUploadClick=() => {
+	onUploadClick = () => {
 		if (!this.dropBoxEnabled) {
 			return
 		}
 		this.fileInput.click();
 	}
+	downloadByFullPath = (fullPath: string) => {
+
+		window.open('http://tools.moonkop.com/upload/' + fullPath);
+	};
+	renderFileContainer = () => {
+		return <div className="filesContainer">
+			{this.state.currentFiles.map(this.renderFiles)}
+		</div>;
+	}
+	renderFiles = (item: MyFile) => {
+		let fullPath = path.resolve(this.state.currentPath, item.name);
+
+		return <div className='file'>
+
+			{
+				item.is_dir ? <span className="fileIcon iconfont iconputongwenjianjia"/> :
+					<span className="fileIcon iconfont iconwenjian_"/>
+			}
+			<span className="fileName" onClick={() => {
+				if (item.is_dir) {
+					location.hash = fullPath;
+				} else {
+					this.downloadByFullPath(fullPath);
+				}
+			}}>
+			{item.name}
+			</span>
+
+			<div className="fileActions">
+				<span className="fileAction iconfont iconshanchu" onClick={() => {
+					if (!confirm('真的要删掉人家嘛？')) {
+						return;
+					}
+					Actions.deleteFile(fullPath);
+					setTimeout(() => {
+						this.getCurrentFileList();
+					}, 100)
+
+				}}/>
+
+				{!item.is_dir && <span className="fileAction iconfont iconxiazai" onClick={() => {
+					this.downloadByFullPath(fullPath);
+				}}/>}
+			</div>
+
+		</div>;
+
+	};
+
+	renderPathNav() {
+		let lastPath = '/';
+		let paths = (this.state.currentPath).split('/').filter(Boolean);
+		paths.unshift('');
+		let jsx = paths.map(item => {
+			lastPath = path.resolve(lastPath + '/' + item);
+			let full = lastPath;
+			return <span className='pathItem' onClick={() => {
+				location.hash = full;
+			}}>{item ? item : 'root'}</span>
+		})
+		let jsxJoined = [];
+		jsx.map(item => {
+			jsxJoined.push(<span className="iconfont iconpage-next"/>)
+			jsxJoined.push(item);
+		})
+		return jsxJoined;
+	}
+
+	renderDropBox = () => {
+		return <div className="dropBox"
+		            style={{
+			            background: this.state.uploadPercent == 100 ? null : `linear-gradient(to top,#FFd1d9 ${this.state.uploadPercent}%,#FFF ${this.state.uploadPercent}%)`
+		            }}
+		            onClick={this.onUploadClick}
+		            onDragEnter={e => {
+			            console.log('onDragEnter', e)
+			            if (!this.dropBoxEnabled) {
+				            return
+			            }
+			            clearTimeout(this.resetTimer);
+			            this.setDropBoxText('啊~疼~😭');
+		            }}
+		            onDragLeave={e => {
+			            console.log('onDragLeave', e)
+			            if (!this.dropBoxEnabled) {
+				            return
+			            }
+			            this.setDropBoxText('吓死宝宝了~😣');
+			            clearTimeout(this.resetTimer);
+			            this.resetTimer = setTimeout(() => {
+				            this.setDropBoxText('拖进来吧');
+			            }, 1500)
+		            }}
+		            onDrop={(e) => {
+			            console.log('onDrop', e)
+			            if (!this.dropBoxEnabled) {
+				            return
+			            }
+			            clearTimeout(this.resetTimer);
+			            let files = e.dataTransfer.files;
+			            this.upLoadFile(files);
+			            return false;
+		            }}
+		>
+			<div class="dropBox-text">
+				{this.state.dropBoxText}
+			</div>
+		</div>
+
+	}
+
+	renderActions() {
+		return <div className="actions">
+			<div className='mkdir' onClick={() => {
+				let name = prompt('input dir name:');
+				if (!name) {
+					return;
+				}
+				Actions.mkdir(this.state.currentPath + '/' + name);
+				setTimeout(() => {
+					this.getCurrentFileList();
+				}, 100)
+
+			}}>
+				<span className="iconfont iconxinjianwenjianjia1"/>
+			</div>
+			<div className="upload" onClick={this.onUploadClick}>
+				<span className="iconfont iconshangchuan1"/>
+			</div>
+			<div className="download">
+				<span className="iconfont iconxiazai"/>
+			</div>
+			<div className="delete">
+				<span className="iconfont iconshanchu"/>
+			</div>
+		</div>
+	}
 
 	render() {
 		return (
 			<div className='app'>
-				<div className="dropBox"
-				     style={{
-					     background: this.state.uploadPercent == 100 ? null : `linear-gradient(to top,#FFd1d9 ${this.state.uploadPercent}%,#FFF ${this.state.uploadPercent}%)`
-				     }}
-				     onClick={this.onUploadClick}
-				     onDragEnter={e => {
-					     console.log('onDragEnter', e)
-					     if (!this.dropBoxEnabled) {
-						     return
-					     }
-					     clearTimeout(this.resetTimer);
-					     this.setDropBoxText('啊~疼~😭');
-				     }}
-				     onDragLeave={e => {
-					     console.log('onDragLeave', e)
-					     if (!this.dropBoxEnabled) {
-						     return
-					     }
-					     this.setDropBoxText('吓死宝宝了~😣');
-					     clearTimeout(this.resetTimer);
-					     this.resetTimer = setTimeout(() => {
-						     this.setDropBoxText('拖进来吧');
-					     }, 1500)
-				     }}
-				     onDrop={(e) => {
-					     console.log('onDrop', e)
-					     if (!this.dropBoxEnabled) {
-						     return
-					     }
-					     clearTimeout(this.resetTimer);
-					     let files = e.dataTransfer.files;
-					     this.upLoadFile(files);
-					     return false;
-				     }}
-				>
-					<div class="dropBox-text">
-						{this.state.dropBoxText}
-					</div>
-				</div>
-
+				{this.renderDropBox()}
 				<div class="urls">
 					{this.state.urls.map(item => {
 						return <div>
@@ -192,73 +302,12 @@ class App extends Component<{}, AppState> {
 					this.fileInput = ref;
 				}} type="file" name="fileToUpload" onChange={(e) => {
 					this.upLoadFile(e.currentTarget.files);
-				}}/>
+				}} multiple={true}/>
 				<div className="currentPath">
-					{(() => {
-						let lastPath = '/';
-						let paths = (this.state.currentPath).split('/').filter(Boolean);
-						paths.unshift('');
-						let jsx = paths.map(item => {
-							console.log(item);
-							lastPath = path.resolve(lastPath + '/' + item);
-							let full = lastPath;
-							return <span className='pathItem' onClick={() => {
-								console.log(full);
-								location.hash = full;
-							}}>{item ? item : 'root'}</span>
-						})
-						let jsxJoined = [];
-						jsx.map(item => {
-							jsxJoined.push(item);
-							jsxJoined.push(<span className="iconfont iconpage-next"/>)
-						})
-						jsxJoined.pop();
-						return jsxJoined;
-					})()}
+					{this.renderPathNav()}
 				</div>
-
-				<div className="actions">
-					<div className='mkdir' onClick={() => {
-						let name = prompt('input dir name:');
-						if (!name) {
-							return;
-						}
-						Actions.mkdir(this.state.currentPath + '/' + name);
-						setTimeout(() => {
-							this.getCurrentFileList();
-						}, 100)
-
-					}}>
-						<span className="iconfont iconxinjianwenjianjia1"/>
-					</div>
-					<div className="upload" onClick={this.onUploadClick}>
-						<span className="iconfont iconshangchuan1"/>
-					</div>
-					<div className="download">
-						<span className="iconfont iconxiazai"/>
-					</div>
-					<div className="delete">
-						<span className="iconfont iconshanchu"/>
-					</div>
-				</div>
-
-				<div className="filesContainer">
-					{this.state.currentFiles.map(item => {
-						return <div className='file' onClick={() => {
-							let path1 = path.resolve(this.state.currentPath, item.name);
-							if (item.is_dir) {
-								location.hash = path1;
-							} else {
-								window.open('http://tools.moonkop.com/upload/' + path1);
-							}
-						}}>
-
-							{item.is_dir ? <span className="iconfont iconputongwenjianjia"/> :
-								<span className="iconfont iconwenjian_"/>}{item.name}
-						</div>;
-					})}
-				</div>
-
+				{this.renderActions()}
+				{this.renderFileContainer()}
 			</div>
 		);
 	}
