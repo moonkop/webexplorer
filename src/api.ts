@@ -33,6 +33,8 @@ export function request(options: {
 export interface MyFile {
 	name: string,
 	is_dir: 0 | 1;
+	children?: Record<string,MyFile>;
+	is_selected: boolean;
 }
 
 export class Actions {

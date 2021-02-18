@@ -9,6 +9,7 @@ interface AppState {
 	uploadPercent: number;
 	currentPath: string;
 	currentFiles: MyFile[];
+	tree: MyFile;
 }
 
 class App extends Component<{}, AppState> {
@@ -23,7 +24,13 @@ class App extends Component<{}, AppState> {
 			urls         : [],
 			uploadPercent: 100,
 			currentPath  : '',
-			currentFiles : []
+			currentFiles : [],
+			tree         : {
+				name       : 'root',
+				is_dir     : 1,
+				children   : {},
+				is_selected: false
+			},
 		}
 		this.dropBoxEnabled = true;
 	}
@@ -63,9 +70,44 @@ class App extends Component<{}, AppState> {
 	async getCurrentFileList() {
 		this.setState({currentFiles: []})
 		let files = await Actions.getFileList(this.state.currentPath);
-		this.setState({currentFiles: files})
+		files.map(item => item.is_selected = false);
+		this.setState({currentFiles: files},()=>{
+			this.buildCurrentTree();
+		})
 	}
 
+	buildCurrentTree = () => {
+		let arr = this.state.currentPath.split('/').filter(Boolean);
+		console.log('old tree', this.state.tree);
+
+		let tree = JSON.parse(JSON.stringify(this.state.tree));
+		let currentDir = arr.reduce((prev, next) => {
+			let my = prev.children[next];
+			if (!my) {
+				console.log('new children')
+				prev.children[next] = {
+					children   : {},
+					name       : next,
+					is_selected: false,
+					is_dir     : 1
+				}
+			}
+			return prev.children[next];
+
+		}, tree as MyFile );
+		if (!currentDir.children) {
+			currentDir.children = {};
+		}
+		this.state.currentFiles.filter(item => item.is_dir).map(item=>{
+			if (!currentDir.children[item.name]) {
+				currentDir.children[item.name] = item;
+			}
+		});
+		this.setState({
+			tree: tree
+		})
+		console.log('new tree',tree);
+	}
 	upLoadFile = async (files: FileList) => {
 		if (files.length == 0) {
 			return;
@@ -140,8 +182,8 @@ class App extends Component<{}, AppState> {
 		this.setState({
 			dropBoxText: str
 		})
-
 	};
+
 	onUploadClick = () => {
 		if (!this.dropBoxEnabled) {
 			return
@@ -151,6 +193,20 @@ class App extends Component<{}, AppState> {
 	downloadByFullPath = (fullPath: string) => {
 
 		window.open('http://tools.moonkop.com/upload/' + fullPath);
+	};
+	renderDirTree = () => {
+		let renderNode = (node: MyFile) => {
+			return <div className='tree-node'>
+				{node.name}
+				{node.children&&Object.values(node.children).map(item=>{
+					return renderNode(item);
+				})}
+			</div>;
+
+		};
+		return <div className="tree">
+			{renderNode(this.state.tree)}
+		</div>;
 	};
 	renderFileContainer = () => {
 		return <div className="filesContainer">
@@ -289,25 +345,32 @@ class App extends Component<{}, AppState> {
 	render() {
 		return (
 			<div className='app'>
-				{this.renderDropBox()}
-				<div class="urls">
-					{this.state.urls.map(item => {
-						return <div>
-							{item}
-						</div>;
-					})}
+				<div className="left">
+					{this.renderDirTree()}
+
 				</div>
-				<div class="progress"></div>
-				<input id='fileInput' ref={(ref) => {
-					this.fileInput = ref;
-				}} type="file" name="fileToUpload" onChange={(e) => {
-					this.upLoadFile(e.currentTarget.files);
-				}} multiple={true}/>
-				<div className="currentPath">
-					{this.renderPathNav()}
+				<div className="right">
+					{this.renderDropBox()}
+					<div class="urls">
+						{this.state.urls.map(item => {
+							return <div>
+								{item}
+							</div>;
+						})}
+					</div>
+					<div class="progress"></div>
+					<input id='fileInput' ref={(ref) => {
+						this.fileInput = ref;
+					}} type="file" name="fileToUpload" onChange={(e) => {
+						this.upLoadFile(e.currentTarget.files);
+					}} multiple={true}/>
+					<div className="currentPath">
+						{this.renderPathNav()}
+					</div>
+					{this.renderActions()}
+					{this.renderFileContainer()}
 				</div>
-				{this.renderActions()}
-				{this.renderFileContainer()}
+
 			</div>
 		);
 	}
